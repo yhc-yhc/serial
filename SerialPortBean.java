@@ -8,8 +8,13 @@ import gnu.io.PortInUseException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
 
-public class SerialPortBean {
+public class SerialPortBean extends Observable implements Observer {
+	SerialControll sc = SerialControll.getInstance();
 	int port;
 	CommPort thisPort;
 	CommPortIdentifier thePort;
@@ -20,7 +25,25 @@ public class SerialPortBean {
 	StringBuffer buf = new StringBuffer();
 	boolean hasMsg = false;
 	Thread l_thread;
+	private boolean isUseDataFlag = false;// the data recevied is -1
+	String currentSendMsg;
+	String currentRecdMsg;
+	String sORr;
+	public boolean isUseDataFlag() {
+		return isUseDataFlag;
+	}
+	public void setUseDataFlag(boolean isUseDataFlag) {
+		if(this.isUseDataFlag != isUseDataFlag){
+			boolean b = this.isUseDataFlag;
+			this.isUseDataFlag = isUseDataFlag;
+			if(b && this.isUseDataFlag ==false){
+				setChanged();
+				notifyObservers(this);
+			}
+		}
+	}
 	public SerialPortBean(int port,String backEndStr){
+		addObserver(this);
 		this.port = port;
 		this.backEndStr = backEndStr;
 		String portName = "COM"+port;
@@ -38,6 +61,8 @@ public class SerialPortBean {
 			hasMsg = false;
 			buf = new StringBuffer();
 			String res = "sucess@";
+			currentSendMsg = "sucess";
+			oprateCaches(port,"S");
 			os.write(res.getBytes());
 			System.out.println(port_threadName() + " response : " +res);
 		} catch (IOException e) {
@@ -79,22 +104,12 @@ public class SerialPortBean {
 	//处理接收到的数据
 	//b,如果监听到的信息是有用的，改变信息标识，通知全局串口观察者对象将   串口@结果    保存
 	public void oprateBackData(int data){
+		setUseDataFlag(true);
 		if(hasMsg){
 			buf = new StringBuffer();
 		}
 		char b = (char) data;
 		buf.append(b);
-		StringBuffer sb =new StringBuffer();
-		sb.append(b);
-		if(sb.toString().equals(backEndStr) ){
-			hasMsg = true;
-			System.err.println("=====================================");
-			System.err.println(port_threadName()+" recevied "+ buf);
-			System.err.println("=====================================");
-			if(port%2 != 0){
-				receviesPort();
-			}
-		}
 	}
 	//初始化一个串口
 	//a,开启一个线程，获得串口输入流，在线程中监听流向此串口的数据
@@ -106,16 +121,12 @@ public class SerialPortBean {
 				System.out.println(port_threadName() +" is inited ! ");
 				try {
 					while (true) {
-						try {
-							Thread.sleep(0);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
 						int data = ins.read();
 						if(data != -1){
 							//System.out.println(data);
 							oprateBackData(data);
+						}else{
+							setUseDataFlag(false);
 						}
 					}
 				} catch (IOException e) {
@@ -131,19 +142,22 @@ public class SerialPortBean {
 		if (s == null) {
 			return null;
 		}
-		String msg = s + backEndStr;
 		StringBuffer sb = new StringBuffer();
+		String msg = s + backEndStr;
 		try {
 			os.write(msg.getBytes());
+			currentSendMsg = s;
+			System.out.println(currentSendMsg);
+			oprateCaches(port,"S");
 			System.out.println(port_threadName() +" send : "+s);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		int i=1;
 		while (true) {
+			int i=1;
 			try {
-				Thread.sleep(2000);
+				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -155,16 +169,12 @@ public class SerialPortBean {
 				buf = new StringBuffer();
 				break;
 			}
-			i=i+1;
-			System.out.println(i);
-			//if time is to long 
-			if(i==3){
+			i++;
+			if(i == 10){
 				sb.append("timeout");
 				break;
 			}
-			
 		}
-		System.out.println(port_threadName()+" receved : "+sb);
 		return sb;
 	}
 	//使用此串口向外发送一条信息
@@ -174,5 +184,36 @@ public class SerialPortBean {
 			sbs[i] = sendMsg(params[i]);
 		}
 		return sbs;
+	}
+	
+	//
+	@Override
+	public void update(Observable o, Object arg) {
+		// TODO Auto-generated method stub
+		currentRecdMsg = buf.toString();
+		hasMsg = true;
+		oprateCaches(port,"R");
+		System.err.println(port_threadName()+" recevied "+ buf);
+		System.err.println("=====================================");
+		if(port%2 != 0){
+			receviesPort();
+		}
+	}
+	//oprate the cachesData
+	public void oprateCaches(int port,String sORr){
+		List<Object[]> rs = sc.portsDatas.get(port);
+		String oprateData;
+		if (sORr.equals("S")) {
+			oprateData = currentSendMsg;
+		}else {
+			oprateData = currentRecdMsg;
+		}
+		String[] s = {sc.getNowTime(),sORr,oprateData};
+		rs.add(s);
+		sc.addToLogFile(port);
+		if(rs.size()>1){
+			//rs = new ArrayList<Object[]>();
+			//sc.portsDatas.put(port, rs);//
+		}
 	}
 }
