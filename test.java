@@ -22,8 +22,9 @@ public class test {
 		String[] args1 = {"你好@","再见@"};
 		spb2.sendMsgs(args1);*/
 		SerialControll sc = SerialControll.getInstance();
+		
 		Object[][] appUserPorts = {{2,"@"},{3,"@"},{4,"@"},{5,"@"}};
-		//Object[][] ports = {{3,"@"}};
+		//Object[][] appUserPorts = {{3,"@"}};
 		sc.setUsePorts(appUserPorts);
 		int[] sendPorts = {2,4};
 		String msg = "hello world!";
