@@ -4,13 +4,26 @@ import gnu.io.CommPort;
 import gnu.io.CommPortIdentifier;
 import gnu.io.PortInUseException;
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Observable;
+import java.util.Observer;
 
 public class SerialControll {
+	SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");//设置日期格式
+	private final String pathName = "C:\\Users\\acer\\Documents\\PortDatasLog";
+	public final HashMap<Integer, List<Object[]>> portsDatas = new HashMap<Integer, List<Object[]>>();//缓存各个串口的数据
 	private final static Map<Integer,CommPortIdentifier> comPorts = getAllAvailabelSerialPort();
 	public static Map<Integer,SerialPortBean> usePorts = new HashMap<Integer, SerialPortBean>();
 	public static Map<Integer,Boolean> hasMsgFlags = new HashMap<Integer, Boolean>();//port@boolean
@@ -55,8 +68,10 @@ public class SerialControll {
 			if(canUse(portName)){
 				SerialPortBean spb = new SerialPortBean(portName,(String)port[1]);
 				usePorts.put(portName, spb);
-				System.out.println(port[0]);
 				hasMsgFlags.put((Integer)portName, false);
+				portsDatas.put(portName, new ArrayList<Object[]>());
+				//create file
+				createLogFile(portName);
 			}
 		}
 		return usePorts;
@@ -174,7 +189,64 @@ public class SerialControll {
 		return r;
 	}
 	private static final SerialControll sc = new SerialControll();
+	private SerialControll(){
+	}
 	public static SerialControll getInstance(){
 		return sc;
+	}
+	//get time now 
+	public String getNowTime(){
+		String s = df.format(new Date());
+		return s;
+	}
+	public void createLogFile(int portName){
+		File file = new File(pathName);
+		if(!file.exists() && !file.isDirectory()){
+			file.mkdir();
+		}
+		File portFfile = new File(pathName+ "\\PORT" + portName +"_LOG.txt");
+		if(!portFfile.exists()){
+			try {
+				portFfile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
+	public void addToLogFile(int portName){
+		File portFfile = new File(pathName+ "\\PORT" + portName +"_LOG.txt");
+		if(!portFfile.exists()){
+			try {
+				portFfile.createNewFile();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		PrintWriter pw;
+		try {
+			pw = new PrintWriter(new BufferedWriter(
+					                new FileWriter(portFfile)));
+			List l = portsDatas.get(portName);
+			for (Object object : l) {
+				Object[] o = (Object[]) object;
+				pw.print(o[0]);
+				String s = (String) o[1];
+				if(s.equals("S")){
+					pw.print(" send: ");
+				}else{
+					pw.print(" recevied: ");
+				}
+				pw.print(o[2]);
+				pw.print("\r\n");
+				pw.print("\r\n");
+			}
+			pw.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+				 
 	}
 }
